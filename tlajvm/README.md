@@ -1,80 +1,53 @@
-# TLAJVM - TLA+ Specification Inference from Java
+# TLAJVM: Java to TLA+ Specification Generator
 
-This project aims to automatically generate TLA+ specifications from Java code. It uses JavaParser to analyze Java source code and generate corresponding TLA+ specifications that can be model checked using TLC or Apalache.
+## Overview
+TLAJVM is a tool for automatically generating TLA+ specifications from arbitrary Java source files. It is designed to be fully generic and dynamic: **no hardcoded logic, no special cases, and no example-specific handling**. The pipeline processes any Java file or directory and produces a corresponding TLA+ specification.
+
+## How It Works
+- Uses JavaParser to parse Java source files.
+- Traverses the AST to extract variables, assignments, control flow, and method calls.
+- Generates TLA+ modules, variables, Init, and Next predicates based on the Java program structure.
+- All output is written to the specified output directory (default: `src/main/resources/tla-specs/`).
+
+## Usage
+
+### 1. Build the Project
+```sh
+mvn clean package
+```
+
+### 2. Run the Pipeline
+To generate a TLA+ specification for a single Java file:
+```sh
+./scripts/run-pipeline.sh --file /path/to/YourJavaFile.java
+```
+
+To generate TLA+ specifications for all Java files in a directory:
+```sh
+./scripts/run-pipeline.sh --dir /path/to/YourJavaDirectory
+```
+
+You can optionally specify a custom output directory:
+```sh
+./scripts/run-pipeline.sh --file /path/to/YourJavaFile.java /custom/output/dir
+```
+
+### 3. View the Output
+All generated TLA+ files will appear in the output directory you specify (default: `src/main/resources/tla-specs/`).
 
 ## Project Structure
+- `src/main/java/com/tlajvm/parser/JavaToTlaPipeline.java`: Main entry point for the pipeline.
+- `src/main/java/com/tlajvm/parser/TlaSpecGenerator.java`: Generic Java-to-TLA+ translation logic.
+- `scripts/run-pipeline.sh`: Script to build and run the pipeline.
+- `src/main/resources/tla-specs/`: Default output directory for TLA+ specifications.
 
-```
-tlajvm/
-├── src/
-│   ├── main/
-│   │   ├── java/
-│   │   │   └── com/
-│   │   │       └── tlajvm/
-│   │   │           └── parser/
-│   │   │               ├── AstExplorer.java
-│   │   │               └── MySimpleProgram.java
-│   │   └── resources/
-│   │       └── logback.xml
-│   └── test/
-│       └── java/
-│           └── com/
-│               └── tlajvm/
-│                   └── parser/
-│                       └── AstExplorerTest.java
-└── pom.xml
-```
-
-## Getting Started
-
-### Prerequisites
-
-- Java 17 or later
-- Maven 3.6 or later
-- TLA+ Toolbox (for model checking)
-
-### Building the Project
-
-```bash
-mvn clean install
-```
-
-### Running the AST Explorer
-
-```bash
-mvn exec:java -Dexec.mainClass="com.tlajvm.parser.AstExplorer"
-```
-
-### Running Tests
-
-```bash
-mvn test
-```
-
-## Features
-
-- Java source code parsing using JavaParser
-- AST exploration and analysis
-- Basic TLA+ specification generation (in progress)
-- Test coverage for core functionality
-
-## Development Status
-
-This project is currently in the early stages of development. The following features are implemented:
-
-- [x] Basic Java source code parsing
-- [x] AST exploration and method analysis
-- [ ] TLA+ specification generation
-- [ ] Model checking integration
+## What This Project Does **NOT** Do
+- No hardcoded logic for any specific Java program, variable, or method.
+- No special-case handling for examples like Dining Philosophers, Deadlock, etc.
+- No demo/test code for direct TLA+ generation outside the pipeline.
 
 ## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+Contributions are welcome! Please ensure all code is generic and does not introduce any hardcoded or special-case logic.
 
 ## License
-
-This project is licensed under the MIT License - see the LICENSE file for details. 
+MIT 
