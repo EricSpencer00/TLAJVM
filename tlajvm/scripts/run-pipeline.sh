@@ -7,14 +7,18 @@ mvn clean package
 # Run the pipeline
 echo "Running Java to TLA+ pipeline..."
 if [ "$1" == "--file" ] && [ -n "$2" ]; then
-    # Process a single file
-    mvn exec:java -Dexec.mainClass="com.tlajvm.parser.JavaToTlaPipeline" -Dexec.args="src/main/java/com/tlajvm/parser/$2 src/main/resources/tla-specs"
+    # Process a single file (absolute or relative path)
+    java_file="$2"
+    output_dir="${3:-src/main/resources/tla-specs}"
+    mvn exec:java -Dexec.mainClass="com.tlajvm.parser.JavaToTlaPipeline" -Dexec.args="$java_file $output_dir"
 elif [ "$1" == "--dir" ] && [ -n "$2" ]; then
-    # Process a directory
-    mvn exec:java -Dexec.mainClass="com.tlajvm.parser.JavaToTlaPipeline" -Dexec.args="$2 src/main/resources/tla-specs"
+    # Process a directory (absolute or relative path)
+    java_dir="$2"
+    output_dir="${3:-src/main/resources/tla-specs}"
+    mvn exec:java -Dexec.mainClass="com.tlajvm.parser.JavaToTlaPipeline" -Dexec.args="$java_dir $output_dir"
 else
-    echo "Usage: ./run-pipeline.sh --file <java-file>"
-    echo "   or: ./run-pipeline.sh --dir <java-directory>"
+    echo "Usage: ./run-pipeline.sh --file <java-file> [output-dir]"
+    echo "   or: ./run-pipeline.sh --dir <java-directory> [output-dir]"
     exit 1
 fi
 
