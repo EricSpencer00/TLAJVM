@@ -5,7 +5,8 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.stmt.ExpressionStmt;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -13,13 +14,15 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-@Slf4j
 public class AstExplorer {
+    private static final Logger log = LoggerFactory.getLogger(AstExplorer.class);
+
     public static void main(String[] args) {
         try {
             // Get the path to the example Java file
-            Path filePath = Paths.get("src", "main", "java", "com", "tlajvm", "parser", "MySimpleProgram.java");
-            Path tlaPath = Paths.get("src", "main", "resources", "MySimpleProgram.tla");
+            String fileName = args.length > 0 ? args[0] : "MySimpleProgram";
+            Path filePath = Paths.get("src", "main", "java", "com", "tlajvm", "parser", fileName + ".java");
+            Path tlaPath = Paths.get("src", "main", "resources", fileName + ".tla");
             
             // Parse the Java file
             try (FileInputStream in = new FileInputStream(filePath.toFile())) {
@@ -44,6 +47,8 @@ public class AstExplorer {
     }
 
     private static class MethodVisitor extends VoidVisitorAdapter<Void> {
+        private static final Logger log = LoggerFactory.getLogger(MethodVisitor.class);
+
         @Override
         public void visit(MethodDeclaration n, Void arg) {
             log.info("  Method name: {}", n.getName());
