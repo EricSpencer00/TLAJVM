@@ -1,38 +1,80 @@
-# TLAJVM
+# TLAJVM - TLA+ Specification Inference from Java
 
-A Java Virtual Machine implementation project.
+This project aims to automatically generate TLA+ specifications from Java code. It uses JavaParser to analyze Java source code and generate corresponding TLA+ specifications that can be model checked using TLC or Apalache.
 
-## Requirements
+## Project Structure
 
-- Java 17 or higher
-- Maven 3.6 or higher
+```
+tlajvm/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/
+│   │   │       └── tlajvm/
+│   │   │           └── parser/
+│   │   │               ├── AstExplorer.java
+│   │   │               └── MySimpleProgram.java
+│   │   └── resources/
+│   │       └── logback.xml
+│   └── test/
+│       └── java/
+│           └── com/
+│               └── tlajvm/
+│                   └── parser/
+│                       └── AstExplorerTest.java
+└── pom.xml
+```
 
-## Building the Project
+## Getting Started
 
-To build the project, run:
+### Prerequisites
+
+- Java 17 or later
+- Maven 3.6 or later
+- TLA+ Toolbox (for model checking)
+
+### Building the Project
 
 ```bash
 mvn clean install
 ```
 
-## Running Tests
+### Running the AST Explorer
 
-To run the tests:
+```bash
+mvn exec:java -Dexec.mainClass="com.tlajvm.parser.AstExplorer"
+```
+
+### Running Tests
 
 ```bash
 mvn test
 ```
 
-## Project Structure
+## Features
 
-- `src/main/java` - Main source code
-- `src/test/java` - Test source code
-- `src/main/resources` - Configuration files and resources
-- `src/test/resources` - Test resources
+- Java source code parsing using JavaParser
+- AST exploration and analysis
+- Basic TLA+ specification generation (in progress)
+- Test coverage for core functionality
 
-## Dependencies
+## Development Status
 
-- JUnit Jupiter 5.9.2 - Testing framework
-- SLF4J 2.0.7 - Logging facade
-- Logback 1.4.11 - Logging implementation
-- Lombok 1.18.30 - Reduces boilerplate code 
+This project is currently in the early stages of development. The following features are implemented:
+
+- [x] Basic Java source code parsing
+- [x] AST exploration and method analysis
+- [ ] TLA+ specification generation
+- [ ] Model checking integration
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 
