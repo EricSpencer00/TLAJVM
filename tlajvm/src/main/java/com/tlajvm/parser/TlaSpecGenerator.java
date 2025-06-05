@@ -5,16 +5,16 @@ import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.stmt.*;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
 
-@Slf4j
 public class TlaSpecGenerator {
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TlaSpecGenerator.class);
+    private static final Logger log = LoggerFactory.getLogger(TlaSpecGenerator.class);
     private final StringBuilder specBuilder = new StringBuilder();
     private final List<String> variables = new ArrayList<>();
     private final Map<String, String> variableTypes = new HashMap<>();
@@ -25,11 +25,12 @@ public class TlaSpecGenerator {
     public void generateSpec(CompilationUnit cu, Path outputPath) {
         // Collect all field declarations before building the TLA+ specification
         collectFieldDeclarations(cu);
+        
         // Start building the TLA+ specification
         specBuilder.append("---- MODULE ").append(cu.getType(0).getNameAsString()).append(" ----\n\n");
         
         // Add EXTENDS clause
-        specBuilder.append("EXTENDS Naturals, Sequences\n\n");
+        specBuilder.append("EXTENDS Naturals, Sequences, TLC\n\n");
         
         // Add variables section
         specBuilder.append("VARIABLE pc\n");
@@ -41,13 +42,19 @@ public class TlaSpecGenerator {
         specBuilder.append("  /\\ pc = 0\n");
         variables.forEach(v -> {
             String type = variableTypes.getOrDefault(v, "0");
-            specBuilder.append("  /\\ ").append(v).append(" = ").append(type).append("\n");
+            if (v.endsWith("[]")) {
+                String baseName = v.substring(0, v.length() - 2);
+                specBuilder.append("  /\\ ").append(baseName).append(" = [i \\in 1..N | ").append(type).append("]\n");
+            } else {
+                specBuilder.append("  /\\ ").append(v).append(" = ").append(type).append("\n");
+            }
         });
         specBuilder.append("\n");
         
         // Add Next predicate
         specBuilder.append("Next ==\n");
-        specBuilder.append("  \\/ ").append(generateNextPredicate(cu)).append("\n\n");
+        specBuilder.append(generateNextPredicate(cu));
+        specBuilder.append("\n\n");
         
         // Add invariants
         if (!invariants.isEmpty()) {
@@ -62,6 +69,10 @@ public class TlaSpecGenerator {
             temporalProperties.forEach(prop -> specBuilder.append("  /\\ ").append(prop).append("\n"));
             specBuilder.append("\n");
         }
+        
+        // Add deadlock freedom property
+        specBuilder.append("DeadlockFreedom ==\n");
+        specBuilder.append("  WF_vars(pc)\n\n");
         
         // Add module end
         specBuilder.append("====");
@@ -92,6 +103,8 @@ public class TlaSpecGenerator {
                         handleWhileStmt((WhileStmt) stmt, nextBuilder);
                     } else if (stmt instanceof IfStmt) {
                         handleIfStmt((IfStmt) stmt, nextBuilder);
+                    } else if (stmt instanceof BlockStmt) {
+                        handleBlockStmt((BlockStmt) stmt, nextBuilder);
                     }
                 });
             });
@@ -128,11 +141,11 @@ public class TlaSpecGenerator {
             int loopStart = pcCounter;
             
             // Add loop condition check
-            nextBuilder.append("Step").append(pcCounter).append(" ==\n");
-            nextBuilder.append("  /\\ pc = ").append(pcCounter).append("\n");
-            nextBuilder.append("  /\\ ").append(condition).append("\n");
-            nextBuilder.append("  /\\ pc' = ").append(pcCounter + 1).append("\n");
-            nextBuilder.append("  /\\ UNCHANGED <<");
+            nextBuilder.append("  \\E Step").append(pcCounter).append(" ==\n");
+            nextBuilder.append("    /\\ pc = ").append(pcCounter).append("\n");
+            nextBuilder.append("    /\\ ").append(condition).append("\n");
+            nextBuilder.append("    /\\ pc' = ").append(pcCounter + 1).append("\n");
+            nextBuilder.append("    /\\ UNCHANGED <<");
             variables.forEach(v -> nextBuilder.append(v).append(", "));
             nextBuilder.setLength(nextBuilder.length() - 2);
             nextBuilder.append(">>\n");
@@ -142,19 +155,15 @@ public class TlaSpecGenerator {
             stmt.getBody().accept(this, nextBuilder);
             
             // Add loop end
-            nextBuilder.append("Step").append(pcCounter).append(" ==\n");
-            nextBuilder.append("  /\\ pc = ").append(pcCounter).append("\n");
-            nextBuilder.append("  /\\ ~(").append(condition).append(")\n");
-            nextBuilder.append("  /\\ pc' = ").append(pcCounter + 1).append("\n");
-            nextBuilder.append("  /\\ UNCHANGED <<");
+            nextBuilder.append("  \\E Step").append(pcCounter).append(" ==\n");
+            nextBuilder.append("    /\\ pc = ").append(pcCounter).append("\n");
+            nextBuilder.append("    /\\ ~(").append(condition).append(")\n");
+            nextBuilder.append("    /\\ pc' = ").append(pcCounter + 1).append("\n");
+            nextBuilder.append("    /\\ UNCHANGED <<");
             variables.forEach(v -> nextBuilder.append(v).append(", "));
             nextBuilder.setLength(nextBuilder.length() - 2);
             nextBuilder.append(">>\n");
             pcCounter++;
-            
-            // Add invariant for loop termination
-            invariants.add("WF_vars(pc)");
-            temporalProperties.add("<>[](pc > " + loopStart + " => pc > " + pcCounter + ")");
         }
 
         private void handleIfStmt(IfStmt stmt, StringBuilder nextBuilder) {
@@ -162,11 +171,11 @@ public class TlaSpecGenerator {
             int ifStart = pcCounter;
             
             // Add if condition check
-            nextBuilder.append("Step").append(pcCounter).append(" ==\n");
-            nextBuilder.append("  /\\ pc = ").append(pcCounter).append("\n");
-            nextBuilder.append("  /\\ ").append(condition).append("\n");
-            nextBuilder.append("  /\\ pc' = ").append(pcCounter + 1).append("\n");
-            nextBuilder.append("  /\\ UNCHANGED <<");
+            nextBuilder.append("  \\E Step").append(pcCounter).append(" ==\n");
+            nextBuilder.append("    /\\ pc = ").append(pcCounter).append("\n");
+            nextBuilder.append("    /\\ ").append(condition).append("\n");
+            nextBuilder.append("    /\\ pc' = ").append(pcCounter + 1).append("\n");
+            nextBuilder.append("    /\\ UNCHANGED <<");
             variables.forEach(v -> nextBuilder.append(v).append(", "));
             nextBuilder.setLength(nextBuilder.length() - 2);
             nextBuilder.append(">>\n");
@@ -177,32 +186,44 @@ public class TlaSpecGenerator {
             
             // Add else branch if present
             if (stmt.getElseStmt().isPresent()) {
-                nextBuilder.append("Step").append(pcCounter).append(" ==\n");
-                nextBuilder.append("  /\\ pc = ").append(ifStart).append("\n");
-                nextBuilder.append("  /\\ ~(").append(condition).append(")\n");
-                nextBuilder.append("  /\\ pc' = ").append(pcCounter + 1).append("\n");
-                nextBuilder.append("  /\\ UNCHANGED <<");
+                nextBuilder.append("  \\E Step").append(pcCounter).append(" ==\n");
+                nextBuilder.append("    /\\ pc = ").append(ifStart).append("\n");
+                nextBuilder.append("    /\\ ~(").append(condition).append(")\n");
+                nextBuilder.append("    /\\ pc' = ").append(pcCounter + 1).append("\n");
+                nextBuilder.append("    /\\ UNCHANGED <<");
                 variables.forEach(v -> nextBuilder.append(v).append(", "));
                 nextBuilder.setLength(nextBuilder.length() - 2);
                 nextBuilder.append(">>\n");
                 pcCounter++;
-                
                 stmt.getElseStmt().get().accept(this, nextBuilder);
             }
         }
 
+        private void handleBlockStmt(BlockStmt stmt, StringBuilder nextBuilder) {
+            stmt.getStatements().forEach(s -> {
+                if (s instanceof ExpressionStmt) {
+                    handleExpressionStmt((ExpressionStmt) s, nextBuilder);
+                } else if (s instanceof WhileStmt) {
+                    handleWhileStmt((WhileStmt) s, nextBuilder);
+                } else if (s instanceof IfStmt) {
+                    handleIfStmt((IfStmt) s, nextBuilder);
+                } else if (s instanceof BlockStmt) {
+                    handleBlockStmt((BlockStmt) s, nextBuilder);
+                }
+            });
+        }
+
         private void addStep(String varName, String value, StringBuilder nextBuilder) {
-            nextBuilder.append("Step").append(pcCounter).append(" ==\n");
-            nextBuilder.append("  /\\ pc = ").append(pcCounter).append("\n");
-            nextBuilder.append("  /\\ ").append(varName).append("' = ").append(value).append("\n");
-            nextBuilder.append("  /\\ pc' = ").append(pcCounter + 1).append("\n");
-            nextBuilder.append("  /\\ UNCHANGED <<");
+            nextBuilder.append("  \\E Step").append(pcCounter).append(" ==\n");
+            nextBuilder.append("    /\\ pc = ").append(pcCounter).append("\n");
+            nextBuilder.append("    /\\ ").append(varName).append("' = ").append(value).append("\n");
+            nextBuilder.append("    /\\ pc' = ").append(pcCounter + 1).append("\n");
+            nextBuilder.append("    /\\ UNCHANGED <<");
             variables.stream()
                     .filter(v -> !v.equals(varName))
                     .forEach(v -> nextBuilder.append(v).append(", "));
             nextBuilder.setLength(nextBuilder.length() - 2);
             nextBuilder.append(">>\n");
-            
             pcCounter++;
         }
     }
@@ -219,6 +240,10 @@ public class TlaSpecGenerator {
                         variableTypes.put(name, "FALSE");
                     } else if (type.equals("int")) {
                         variableTypes.put(name, "0");
+                    } else if (type.endsWith("[]")) {
+                        // Handle array types
+                        variables.add(name + "[]");
+                        variableTypes.put(name + "[]", "FALSE");
                     } else {
                         variableTypes.put(name, "0");
                     }
