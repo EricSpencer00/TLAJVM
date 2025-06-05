@@ -33,6 +33,8 @@ public class JavaToTlaPipeline {
         String fileName = javaFile.getFileName().toString();
         String tlaFileName = fileName.substring(0, fileName.lastIndexOf('.')) + ".tla";
         Path tlaFile = outputDir.resolve(tlaFileName);
+        log.info("Intended TLA+ output path: {}", tlaFile.toAbsolutePath());
+        System.out.println("[DEBUG] Intended TLA+ output path: " + tlaFile.toAbsolutePath());
         
         // Create output directory if it doesn't exist
         Files.createDirectories(outputDir);
@@ -63,6 +65,7 @@ public class JavaToTlaPipeline {
     }
 
     public static void main(String[] args) {
+        System.out.println("[DEBUG] JavaToTlaPipeline args: " + java.util.Arrays.toString(args));
         if (args.length < 2) {
             System.out.println("Usage: java JavaToTlaPipeline <source-dir> <output-dir>");
             System.exit(1);

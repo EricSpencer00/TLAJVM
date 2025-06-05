@@ -118,7 +118,7 @@
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.1.0</version>
         <configuration>
-          <mainClass>com.tlajvm.Parse</mainClass>
+          <mainClass>com.tlajvm.parser.JavaToTlaPipeline</mainClass>
         </configuration>
       </plugin>
     </plugins>

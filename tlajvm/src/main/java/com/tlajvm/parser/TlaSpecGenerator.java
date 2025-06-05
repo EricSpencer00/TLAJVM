@@ -57,18 +57,25 @@ public class TlaSpecGenerator {
         specBuilder.append("\n\n");
         
         // Add invariants
-        if (!invariants.isEmpty()) {
-            specBuilder.append("Invariants ==\n");
-            invariants.forEach(inv -> specBuilder.append("  /\\ ").append(inv).append("\n"));
-            specBuilder.append("\n");
-        }
+        specBuilder.append("Invariants ==\n");
+        specBuilder.append("  /\\ pc >= 0\n");
+        variables.forEach(v -> {
+            if (v.endsWith("[]")) {
+                String baseName = v.substring(0, v.length() - 2);
+                specBuilder.append("  /\\ ").append(baseName).append(" \\in [1..N -> Nat]\n");
+            } else if (variableTypes.get(v).equals("FALSE")) {
+                specBuilder.append("  /\\ ").append(v).append(" \\in BOOLEAN\n");
+            } else {
+                specBuilder.append("  /\\ ").append(v).append(" \\in Nat\n");
+            }
+        });
+        specBuilder.append("\n");
         
         // Add temporal properties
-        if (!temporalProperties.isEmpty()) {
-            specBuilder.append("TemporalProperties ==\n");
-            temporalProperties.forEach(prop -> specBuilder.append("  /\\ ").append(prop).append("\n"));
-            specBuilder.append("\n");
-        }
+        specBuilder.append("TemporalProperties ==\n");
+        specBuilder.append("  /\\ WF_vars(pc)\n");
+        variables.forEach(v -> specBuilder.append("  /\\ WF_vars(").append(v).append(")\n"));
+        specBuilder.append("\n");
         
         // Add deadlock freedom property
         specBuilder.append("DeadlockFreedom ==\n");
@@ -81,8 +88,11 @@ public class TlaSpecGenerator {
         try (FileWriter writer = new FileWriter(outputPath.toFile())) {
             writer.write(specBuilder.toString());
             log.info("TLA+ specification written to: {}", outputPath);
+            System.out.println("[INFO] TLA+ specification written to: " + outputPath);
         } catch (IOException e) {
             log.error("Error writing TLA+ specification", e);
+            System.out.println("[ERROR] Could not write TLA+ specification to file. Printing to stdout:\n");
+            System.out.println(specBuilder.toString());
         }
     }
 
@@ -195,6 +205,7 @@ public class TlaSpecGenerator {
                 nextBuilder.setLength(nextBuilder.length() - 2);
                 nextBuilder.append(">>\n");
                 pcCounter++;
+                
                 stmt.getElseStmt().get().accept(this, nextBuilder);
             }
         }

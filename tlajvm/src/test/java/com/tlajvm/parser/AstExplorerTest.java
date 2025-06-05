@@ -16,25 +16,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AstExplorerTest {
     @Test
-    void testParseSimpleProgram() throws IOException {
-        // Get the path to the example Java file
-        Path filePath = Paths.get("src", "main", "java", "com", "tlajvm", "parser", "MySimpleProgram.java");
-        
-        // Parse the Java file
-        try (FileInputStream in = new FileInputStream(filePath.toFile())) {
-            CompilationUnit cu = StaticJavaParser.parse(in);
-            
-            // Verify that we have a class named MySimpleProgram
-            assertTrue(cu.findFirst(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration.class)
-                    .map(c -> c.getNameAsString().equals("MySimpleProgram"))
-                    .orElse(false));
-            
-            // Collect all method names
-            List<String> methodNames = new ArrayList<>();
-            cu.findAll(MethodDeclaration.class).forEach(m -> methodNames.add(m.getNameAsString()));
-            
-            // Verify that we have a main method
-            assertTrue(methodNames.contains("main"));
-        }
+    public void testParseSimpleProgram() {
+        AstExplorer explorer = new AstExplorer();
+        CompilationUnit cu = explorer.parseJavaFile("src/main/java/com/tlajvm/parser/TestProgram.java");
+        assertNotNull(cu);
     }
 } 

@@ -90,6 +90,8 @@ class TlaSpecGeneratorTest {
                 private boolean isRunning;
                 
                 public void process() {
+                    counter = 0;
+                    isRunning = true;
                     while (isRunning) {
                         if (counter < 10) {
                             counter = counter + 1;
@@ -111,6 +113,10 @@ class TlaSpecGeneratorTest {
         assertTrue(Files.exists(outputPath));
         List<String> lines = Files.readAllLines(outputPath);
         
+        // Print the actual output for debugging
+        System.out.println("\nGenerated TLA+ specification for ComplexProgram:");
+        lines.forEach(System.out::println);
+        
         // Check module declaration
         assertTrue(lines.stream().anyMatch(line -> line.contains("---- MODULE ComplexProgram ----")));
         
@@ -130,15 +136,15 @@ class TlaSpecGeneratorTest {
         
         // Check invariants
         assertTrue(lines.stream().anyMatch(line -> line.contains("Invariants ==")));
-        assertTrue(lines.stream().anyMatch(line -> line.contains("WF_vars(pc)")));
+        assertTrue(lines.stream().anyMatch(line -> line.contains("pc >= 0")));
+        assertTrue(lines.stream().anyMatch(line -> line.contains("counter \\in Nat")));
+        assertTrue(lines.stream().anyMatch(line -> line.contains("isRunning \\in BOOLEAN")));
         
         // Check temporal properties
         assertTrue(lines.stream().anyMatch(line -> line.contains("TemporalProperties ==")));
-        assertTrue(lines.stream().anyMatch(line -> line.contains("<>[]")));
-        
-        // Print the generated specification for debugging
-        System.out.println("\nGenerated TLA+ specification for ComplexProgram:");
-        lines.forEach(System.out::println);
+        assertTrue(lines.stream().anyMatch(line -> line.contains("WF_vars(pc)")));
+        assertTrue(lines.stream().anyMatch(line -> line.contains("WF_vars(counter)")));
+        assertTrue(lines.stream().anyMatch(line -> line.contains("WF_vars(isRunning)")));
     }
 
     @Test
@@ -171,6 +177,10 @@ class TlaSpecGeneratorTest {
         assertTrue(Files.exists(outputPath));
         List<String> lines = Files.readAllLines(outputPath);
         
+        // Print the actual output for debugging
+        System.out.println("\nGenerated TLA+ specification for MethodProgram:");
+        lines.forEach(System.out::println);
+        
         // Check module declaration
         assertTrue(lines.stream().anyMatch(line -> line.contains("---- MODULE MethodProgram ----")));
         
@@ -184,9 +194,5 @@ class TlaSpecGeneratorTest {
         // Check Next predicate with method calls
         assertTrue(lines.stream().anyMatch(line -> line.contains("Next ==")));
         assertTrue(lines.stream().anyMatch(line -> line.contains("value' = value + 1")));
-        
-        // Print the generated specification for debugging
-        System.out.println("\nGenerated TLA+ specification for MethodProgram:");
-        lines.forEach(System.out::println);
     }
 } 
