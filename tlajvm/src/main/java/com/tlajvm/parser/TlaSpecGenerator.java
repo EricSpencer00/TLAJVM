@@ -7,6 +7,8 @@ import com.github.javaparser.ast.stmt.*;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.ast.body.Parameter;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -63,10 +65,13 @@ public class TlaSpecGenerator {
             if (v.endsWith("[]")) {
                 String baseName = v.substring(0, v.length() - 2);
                 specBuilder.append("  /\\ ").append(baseName).append(" \\in [1..N -> Nat]\n");
-            } else if (variableTypes.get(v).equals("FALSE")) {
-                specBuilder.append("  /\\ ").append(v).append(" \\in BOOLEAN\n");
             } else {
-                specBuilder.append("  /\\ ").append(v).append(" \\in Nat\n");
+                String type = variableTypes.getOrDefault(v, "0");
+                if (type.equals("FALSE")) {
+                    specBuilder.append("  /\\ ").append(v).append(" \\in BOOLEAN\n");
+                } else {
+                    specBuilder.append("  /\\ ").append(v).append(" \\in Nat\n");
+                }
             }
         });
         specBuilder.append("\n");
@@ -103,14 +108,20 @@ public class TlaSpecGenerator {
     }
 
     private class MethodVisitor extends VoidVisitorAdapter<StringBuilder> {
+        private final Map<String, MethodDeclaration> methodMap = new HashMap<>();
+
         @Override
         public void visit(MethodDeclaration n, StringBuilder nextBuilder) {
+            // Collect all method declarations for inlining
+            methodMap.put(n.getNameAsString(), n);
             n.getBody().ifPresent(body -> {
                 body.getStatements().forEach(stmt -> {
                     if (stmt instanceof ExpressionStmt) {
                         handleExpressionStmt((ExpressionStmt) stmt, nextBuilder);
                     } else if (stmt instanceof WhileStmt) {
                         handleWhileStmt((WhileStmt) stmt, nextBuilder);
+                    } else if (stmt instanceof ForStmt) {
+                        handleForStmt((ForStmt) stmt, nextBuilder);
                     } else if (stmt instanceof IfStmt) {
                         handleIfStmt((IfStmt) stmt, nextBuilder);
                     } else if (stmt instanceof BlockStmt) {
@@ -123,13 +134,28 @@ public class TlaSpecGenerator {
 
         private void handleExpressionStmt(ExpressionStmt stmt, StringBuilder nextBuilder) {
             String expr = stmt.getExpression().toString();
-            
+            // Handle method calls
+            if (stmt.getExpression() instanceof MethodCallExpr) {
+                MethodCallExpr call = (MethodCallExpr) stmt.getExpression();
+                String methodName = call.getNameAsString();
+                if (methodMap.containsKey(methodName)) {
+                    MethodDeclaration method = methodMap.get(methodName);
+                    // Only inline simple methods (no recursion, no control flow)
+                    if (method.getBody().isPresent()) {
+                        for (Statement s : method.getBody().get().getStatements()) {
+                            if (s instanceof ExpressionStmt) {
+                                handleExpressionStmt((ExpressionStmt) s, nextBuilder);
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
             // Extract variable name and value
             if (expr.contains("=")) {
                 String[] parts = expr.split("=");
                 String varName = parts[0].trim();
                 String value = parts[1].trim();
-                
                 // Add variable to list if not already present
                 if (!variables.contains(varName)) {
                     variables.add(varName);
@@ -140,7 +166,6 @@ public class TlaSpecGenerator {
                         variableTypes.put(varName, "0");
                     }
                 }
-                
                 // Add step to Next predicate
                 addStep(varName, value, nextBuilder);
             }
@@ -222,6 +247,52 @@ public class TlaSpecGenerator {
                     handleBlockStmt((BlockStmt) s, nextBuilder);
                 }
             });
+        }
+
+        private void handleForStmt(ForStmt stmt, StringBuilder nextBuilder) {
+            // Convert for-loop to equivalent while-loop
+            // for(init; compare; update) body
+            // becomes:
+            //   init;
+            //   while(compare) { body; update; }
+            if (stmt.getInitialization().size() > 0) {
+                for (com.github.javaparser.ast.expr.Expression init : stmt.getInitialization()) {
+                    if (init.isAssignExpr()) {
+                        // Wrap assignment as ExpressionStmt for reuse
+                        handleExpressionStmt(new ExpressionStmt(init.asAssignExpr()), nextBuilder);
+                    }
+                }
+            }
+            String condition = stmt.getCompare().map(Object::toString).orElse("TRUE");
+            int loopStart = pcCounter;
+            // Add loop condition check
+            nextBuilder.append("  \\E Step").append(pcCounter).append(" ==\n");
+            nextBuilder.append("    /\\ pc = ").append(pcCounter).append("\n");
+            nextBuilder.append("    /\\ ").append(condition).append("\n");
+            nextBuilder.append("    /\\ pc' = ").append(pcCounter + 1).append("\n");
+            nextBuilder.append("    /\\ UNCHANGED <<");
+            variables.forEach(v -> nextBuilder.append(v).append(", "));
+            nextBuilder.setLength(nextBuilder.length() - 2);
+            nextBuilder.append(">>\n");
+            pcCounter++;
+            // Add loop body
+            stmt.getBody().accept(this, nextBuilder);
+            // Add update
+            for (com.github.javaparser.ast.expr.Expression update : stmt.getUpdate()) {
+                if (update.isAssignExpr()) {
+                    handleExpressionStmt(new ExpressionStmt(update.asAssignExpr()), nextBuilder);
+                }
+            }
+            // Add loop end
+            nextBuilder.append("  \\E Step").append(pcCounter).append(" ==\n");
+            nextBuilder.append("    /\\ pc = ").append(pcCounter).append("\n");
+            nextBuilder.append("    /\\ ~(").append(condition).append(")\n");
+            nextBuilder.append("    /\\ pc' = ").append(pcCounter + 1).append("\n");
+            nextBuilder.append("    /\\ UNCHANGED <<");
+            variables.forEach(v -> nextBuilder.append(v).append(", "));
+            nextBuilder.setLength(nextBuilder.length() - 2);
+            nextBuilder.append(">>\n");
+            pcCounter++;
         }
 
         private void addStep(String varName, String value, StringBuilder nextBuilder) {

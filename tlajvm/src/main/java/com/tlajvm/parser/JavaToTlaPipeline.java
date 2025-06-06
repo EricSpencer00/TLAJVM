@@ -16,6 +16,7 @@ public class JavaToTlaPipeline {
     private final Path sourceDir;
     private final Path outputDir;
     private final TlaSpecGenerator specGenerator;
+    private final List<String> processedFiles = new ArrayList<>();
 
     public JavaToTlaPipeline(Path sourceDir, Path outputDir) {
         this.sourceDir = sourceDir;
@@ -34,7 +35,7 @@ public class JavaToTlaPipeline {
         String tlaFileName = fileName.substring(0, fileName.lastIndexOf('.')) + ".tla";
         Path tlaFile = outputDir.resolve(tlaFileName);
         log.info("Intended TLA+ output path: {}", tlaFile.toAbsolutePath());
-        System.out.println("[DEBUG] Intended TLA+ output path: " + tlaFile.toAbsolutePath());
+        System.out.println("[INFO] Intended TLA+ output path: " + tlaFile.toAbsolutePath());
         
         // Create output directory if it doesn't exist
         Files.createDirectories(outputDir);
@@ -42,6 +43,8 @@ public class JavaToTlaPipeline {
         // Generate and write TLA+ specification
         specGenerator.generateSpec(cu, tlaFile);
         log.info("Generated TLA+ specification: {}", tlaFile);
+        System.out.println("[SUCCESS] Generated TLA+ specification: " + tlaFile.toAbsolutePath());
+        processedFiles.add(tlaFileName);
     }
 
     public void processDirectory() throws IOException {
@@ -85,7 +88,10 @@ public class JavaToTlaPipeline {
                 pipeline.processDirectory();
             }
             
-            System.out.println("TLA+ specifications generated successfully!");
+            // Print summary
+            System.out.println("\n[SUMMARY] Processed files:");
+            pipeline.processedFiles.forEach(f -> System.out.println("  - " + outputDir.resolve(f).toAbsolutePath()));
+            System.out.println("[INFO] TLA+ specifications generated successfully!");
         } catch (IOException e) {
             log.error("Error processing files", e);
             System.exit(1);
